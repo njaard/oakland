@@ -1,0 +1,7 @@
+[package]
+name = "display"
+version = "0.1.0"
+authors = ["Charles Samuels <charles@derkarl.org>"]
+
+[dependencies]
+xcb = "*"
