@@ -2,6 +2,10 @@
 name = "display"
 version = "0.1.0"
 authors = ["Charles Samuels <charles@derkarl.org>"]
+edition="2018"
 
 [dependencies]
 xcb = "*"
+xcb-util =  {version="*", features=["icccm"] }
+cairo = {path="../rust-cairo"}
+libc = "*"
