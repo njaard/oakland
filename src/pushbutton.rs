@@ -24,22 +24,23 @@ impl Widget for PushButton
 	}
 	fn mouse_event(&self, e : MouseEvent)
 	{
-		for c in self.clicked_callbacks.borrow_mut().iter_mut()
-			{ c(); }
-		println!("got the event");
+		eprintln!("MOUSE {} {}", self.name(), self.text.borrow());
+		if e == MouseEvent::LeftPress
+		{
+			for c in self.clicked_callbacks.borrow_mut().iter_mut()
+				{ c(); }
+		}
 		self.is_pressed.set( e == MouseEvent::LeftPress );
 		self.repaint();
 	}
 
 	fn draw(&self, draw: &mut cairo::Cairo)
 	{
-		println!("drawing pushbutton w={}", self.width());
 		let width = self.width() as i32;
 		let height = self.height() as i32;
 
 		if self.is_pressed.get()
 		{
-			println!("drawing pushbutton");
 			let graya = Color::rgb(0xe8, 0xe6, 0xe4);
 			let grayb = Color::rgb(0xde, 0xdb, 0xd7);
 			draw.vgradient(2, height-4, graya, grayb);

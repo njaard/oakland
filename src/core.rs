@@ -3,9 +3,11 @@ use std;
 use std::rc::Rc;
 use std::cell::{RefCell, Cell};
 use std::borrow::Borrow;
+use std::sync::Arc;
 
 use crate::draw::Color;
 use crate::dimension::*;
+use crate::queue;
 
 
 enum Policy
@@ -56,11 +58,12 @@ pub struct GraphicalDetails
 	pub(crate) screen_num : i32,
 	top_level_widgets: std::vec::Vec<Rc<Widget>>,
 	repaint_everything : Cell<bool>,
+	event_post: Arc<queue::EventPoster>,
 }
 
 impl GraphicalDetails
 {
-	fn screen<'a>(&'a self) -> xcb::StructPtr<'a, xcb::ffi::xcb_screen_t>
+	pub(crate) fn screen<'a>(&'a self) -> xcb::StructPtr<'a, xcb::ffi::xcb_screen_t>
 	{
 		self
 			.connection
@@ -130,13 +133,18 @@ impl GraphicalDetails
 	pub fn exec(&self)
 	{
 		//let screen = self.conn.screen();
-	
+
 		loop
 		{
-			let event = self.connection.wait_for_event();
+			if self.event_post.wait()
+			{
+				self.event_post.process_channels();
+			}
+
+			let event = self.connection.poll_for_event();
 			match event
 			{
-				None => { break; }
+				None => { () }
 				Some(event) =>
 				{
 					let r = event.response_type() & !0x80;
@@ -149,7 +157,6 @@ impl GraphicalDetails
 						},
 						xcb::BUTTON_PRESS =>
 						{
-							println!("button press");
 							let button_press : &xcb::ButtonPressEvent
 								= unsafe { xcb::cast_event(&event) };
 
@@ -157,8 +164,8 @@ impl GraphicalDetails
 
 							for w in &self.top_level_widgets
 							{
-								eprintln!("top level {:?}", w.name());
 								let w = w.descendant_at(&pos);
+								eprintln!("BUTTON_PRESS {:?} {:?}", w.name(), pos);
 								(*w).mouse_event(MouseEvent::LeftPress);
 							}
 						},
@@ -224,7 +231,9 @@ impl GraphicalDetails
 			);
 			
 			{
+				use crate::draw::DrawPixel;
 				let mut cr = cairo::Cairo::create(&mut surface);
+				cr.fillcolor(Color::rgb(0xc2, 0xbb, 0xb8));
 				w.draw(&mut cr);
 			}
 			surface.flush();
@@ -233,11 +242,21 @@ impl GraphicalDetails
 		
 		self.connection.flush();
 	}
-	
+
 	fn repaint_everything(&self)
 	{
 		println!("marking a repaint as necessary");
 		self.repaint_everything.set(true);
+	}
+
+	fn channel<T: 'static+Clone+Sized+Send, F: 'static+FnMut(T)>(
+		&self,
+		f: F,
+	) -> queue::ChannelWrite<T>
+	{
+		self.event_post.channel(
+			f,
+		)
 	}
 }
 
@@ -350,12 +369,14 @@ impl Graphical
 	pub fn new() -> Graphical
 	{
 		let conn = xcb::Connection::connect(None).unwrap();
+		let event_post = Arc::new(queue::EventPoster::new(&conn.0));
 		let g = GraphicalDetails
 		{
 			connection : conn.0,
 			screen_num : conn.1,
 			top_level_widgets : vec!(),
 			repaint_everything : Cell::new(false),
+			event_post,
 		};
 		
 		Graphical
@@ -363,6 +384,15 @@ impl Graphical
 			det : Rc::new(RefCell::new(g)),
 			widget : WidgetBase::named("root"),
 		}
+	}
+
+	pub fn channel<T: 'static+Clone+Sized+Send, F: 'static+FnMut(T)>(
+		&self,
+		f: F,
+	) -> queue::ChannelWrite<T>
+	{
+		let a : &RefCell<GraphicalDetails> = self.det.borrow();
+		a.borrow().channel(f)
 	}
 	
 	pub fn put<'a, W>(&'a self, mut widget: W)

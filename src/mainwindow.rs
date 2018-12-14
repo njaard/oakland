@@ -9,6 +9,15 @@ pub struct MainWindow
 	child_widgets: RefCell<std::vec::Vec<Rc<Widget>>>,
 }
 
+fn intern_atom(conn: &xcb::Connection, atom_name: &str)
+	-> xcb::Atom
+{
+	xcb::intern_atom(conn, false, atom_name).get_reply()
+		.unwrap()
+		.atom()
+}
+
+
 impl Widget for MainWindow
 {
 	fn as_widget(&self) -> &WidgetBase
@@ -43,7 +52,6 @@ impl Widget for MainWindow
 		for w in self.child_widgets.borrow().iter()
 		{
 			let wrect = w.rectangle();
-			eprintln!("drawing {} at {:?}", w.name(), wrect);
 			c.save();
 			c.translate(wrect.x() as f64, wrect.y() as f64);
 			c.rectangle(0.0, 0.0, wrect.width() as f64, wrect.height() as f64);
@@ -57,10 +65,13 @@ impl Widget for MainWindow
 
 	fn child_at(&self, pt: &Point) -> Option<Rc<Widget>>
 	{
-		println!("checking {:?} on {:?}{{{:?}}}", pt, self.name(), self.rectangle());
 		for w in self.child_widgets.borrow().iter()
 		{
-			return Some(w.clone());
+			if w.rectangle().contains(pt)
+			{
+				eprintln!("CHILD_AT {} has {:?}", self.name(), pt);
+				return Some(w.clone());
+			}
 		}
 		None
 	}
@@ -118,6 +129,90 @@ impl MainWindow
 
 		self.child_widgets.borrow_mut().push( b.clone() );
 		b
+	}
+
+	pub fn set_fullscreen(&self, fullscreen: bool)
+	{
+		unsafe
+		{
+			let NET_WM_STATE_ADD = 1;
+			let NET_WM_STATE_REMOVE = 0;
+
+			let atom_fullscreen = intern_atom(
+				&self.widget.det.as_ref().expect("det").borrow().connection,
+				"_NET_WM_STATE_FULLSCREEN"
+			);
+			let atom_state = intern_atom(
+				&self.widget.det.as_ref().expect("det").borrow().connection,
+				"_NET_WM_STATE"
+			);
+
+			let mut data = [0u32; 20/4];
+			data[0] = if fullscreen { NET_WM_STATE_ADD } else { NET_WM_STATE_REMOVE };
+			data[1] = atom_fullscreen;
+			data[3] = 1;
+
+			let d = xcb::ffi::xproto::xcb_client_message_data_t
+				{ data: [0u8; 20] };
+
+			let mut ev = xcb::ffi::xproto::xcb_client_message_event_t
+			{
+				response_type: xcb::xproto::CLIENT_MESSAGE,
+				format: 32,
+				window: self.widget.true_window_id,
+				type_: atom_state,
+				data: d,
+				sequence: 0,
+			};
+			std::ptr::copy(
+				&data as *const u32 as *const u8,
+				(&mut ev.data.data).as_ptr() as *mut u8, 20
+			);
+
+			xcb::ffi::xproto::xcb_send_event(
+				self.widget.det.as_ref().expect("det").borrow().connection.get_raw_conn(),
+				false as u8,
+				self.widget.det.as_ref().expect("det").borrow().screen().root() as xcb::ffi::xcb_window_t,
+				(xcb::xproto::EVENT_MASK_SUBSTRUCTURE_NOTIFY |
+					xcb::xproto::EVENT_MASK_SUBSTRUCTURE_REDIRECT) as u32,
+				&ev as *const xcb::ffi::xproto::xcb_client_message_event_t
+					as *const libc::c_char
+			);
+
+
+
+			/*
+                    let cookie = xcb::ffi::xcb_intern_atom(
+				self.widget.det.as_ref().expect("det").borrow().connection.get_raw_conn(),
+				0,
+				13, b"_NET_WM_STATE\0".as_ptr() as *const i8
+			);
+			let reply = xcb::ffi::xcb_intern_atom_reply(
+				self.widget.det.as_ref().expect("det").borrow().connection.get_raw_conn(),
+				cookie,
+				std::ptr::null_mut(),
+			);
+			let cookie2 = xcb::ffi::xcb_intern_atom(
+				self.widget.det.as_ref().expect("det").borrow().connection.get_raw_conn(),
+				0,
+				24, b"_NET_WM_STATE_FULLSCREEN\0".as_ptr() as *const i8
+			);
+			let reply2 = xcb::ffi::xcb_intern_atom_reply(
+				self.widget.det.as_ref().expect("det").borrow().connection.get_raw_conn(),
+				cookie2,
+				std::ptr::null_mut(),
+			);
+			xcb::ffi::xcb_change_property(
+				self.widget.det.as_ref().expect("det").borrow().connection.get_raw_conn(),
+				xcb::ffi::XCB_PROP_MODE_REPLACE as u8,
+				self.widget.true_window_id,
+				(*reply).atom,
+				xcb::ATOM as u32,
+				32,
+				if fullscreen { 1 } else { 0 },
+				(&(*reply2).atom) as *const u32 as *const std::ffi::c_void,
+			); */
+		}
 	}
 }
 

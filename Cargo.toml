@@ -9,3 +9,5 @@ xcb = "*"
 xcb-util =  {version="*", features=["icccm"] }
 cairo = {path="../rust-cairo"}
 libc = "*"
+nix = "*"
+antidote = "*"

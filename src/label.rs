@@ -26,10 +26,10 @@ impl Widget for Label
 
 	fn draw(&self, draw: &mut cairo::Cairo)
 	{
-		let height = 30i32;
-		let width = 100i32;
+		draw.set_font_size(20.0);
+		let height = self.height();
+		let width = self.width();
 
-		println!("drawing label");
 		draw.set_color(Color::black());
 		draw.move_to(0.0, (height-5) as f64);
 		draw.show_text(&self.text.borrow());
@@ -54,5 +54,6 @@ impl Label
 	pub fn set_text(&self, text : String)
 	{
 		self.text.replace(text);
+		self.repaint();
 	}
 }
