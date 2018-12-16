@@ -164,9 +164,7 @@ impl GraphicalDetails
 
 							for w in &self.top_level_widgets
 							{
-								let w = w.descendant_at(&pos);
-								eprintln!("BUTTON_PRESS {:?} {:?}", w.name(), pos);
-								(*w).mouse_event(MouseEvent::LeftPress);
+								w.mouse_event(MouseEvent::LeftPress, &pos);
 							}
 						},
 						xcb::BUTTON_RELEASE =>
@@ -179,22 +177,23 @@ impl GraphicalDetails
 
 							for w in &self.top_level_widgets
 							{
-								let w = w.descendant_at(&pos);
-								(*w).mouse_event(MouseEvent::LeftRelease);
+								w.mouse_event(MouseEvent::LeftRelease, &pos);
 							}
 						},
 						xcb::CONFIGURE_NOTIFY =>
 						{
-							println!("resize");
 							let resize_req : &xcb::ConfigureNotifyEvent
 								= unsafe { xcb::cast_event(&event) };
+							println!("resize {},{}", resize_req.width(), resize_req.height());
+							let sz = Size
+							{
+								width: resize_req.width() as u32,
+								height: resize_req.height() as u32,
+							};
 							for w in &self.top_level_widgets
 							{
-								w
-									.resized(
-										Size
-										{ width: resize_req.width() as u32, height: resize_req.height() as u32}
-									);
+								w.as_widget().set_size(sz);
+								w.resized(sz);
 							}
 						},
 						xcb::EXPOSE =>
@@ -265,9 +264,12 @@ pub trait Widget
 	fn as_widget(&self) -> &WidgetBase;
 	fn as_widget_mut(&mut self) -> &mut WidgetBase;
 
-	fn det(&self) -> Rc<RefCell<GraphicalDetails>>
+	fn det(&self) -> Option<Rc<RefCell<GraphicalDetails>>>
 	{
-		self.as_widget().det.borrow().as_ref().expect("connection").clone()
+		self.as_widget()
+			.det
+			.borrow()
+			.clone()
 	}
 
 	fn name(&self) -> &str { &self.as_widget().name }
@@ -287,7 +289,15 @@ pub trait Widget
 		).unwrap();
 	}
 
-	fn setup(&mut self);
+	fn setup(&self, det: Rc<RefCell<GraphicalDetails>>)
+	{
+		*self.as_widget().det.borrow_mut() = Some(det.clone());
+		self.setup_children(det);
+	}
+
+	fn setup_children(&self, _det: Rc<RefCell<GraphicalDetails>>)
+	{
+	}
 
 	fn draw(&self, _ : &mut cairo::Cairo)
 	{
@@ -296,7 +306,13 @@ pub trait Widget
 	fn rectangle(&self) -> Rectangle { self.as_widget().rectangle() }
 	fn width(&self) -> u32 { self.as_widget().rectangle().width() }
 	fn height(&self) -> u32 { self.as_widget().rectangle().height() }
-	fn mouse_event(&self, _ : MouseEvent) { }
+	fn mouse_event(&self, e: MouseEvent, pt: &Point)
+	{
+		if let Some(c) = self.child_at(pt)
+		{
+			c.mouse_event(e, &pt);
+		}
+	}
 	fn resized(&self, _ : Size) { }
 	fn repaint(&self)
 	{
@@ -338,12 +354,14 @@ pub trait Widget
 		let mut rect = self.as_widget().rectangle.get();
 		rect.resize(sz);
 		self.as_widget().rectangle.set(rect);
+		self.resized(*sz);
 	}
 	fn set_geometry(&self, rect : Rectangle)
 	{
 		self.as_widget().rectangle.set(rect);
+		self.resized(rect.size);
 	}
-	fn child_at(&self, pt: &Point) -> Option<Rc<Widget>>
+	fn child_at(&self, _pt: &Point) -> Option<Rc<Widget>>
 	{
 		None
 	}
@@ -395,7 +413,7 @@ impl Graphical
 		a.borrow().channel(f)
 	}
 	
-	pub fn put<'a, W>(&'a self, mut widget: W)
+	pub fn put<'a, W>(&'a self, widget: W)
 		-> Rc<W>
 	where W: Widget + 'static
 	{
@@ -405,8 +423,7 @@ impl Graphical
 		if max_size.height > (i32::max_value() as u32)
 			{ max_size.height = i32::max_value() as u32; }
 
-		widget.as_widget_mut().det = Some(self.det.clone());
-		widget.setup();
+		widget.setup(self.det.clone());
 
 		let b = Rc::new(widget);
 
@@ -439,8 +456,8 @@ pub enum MouseEvent
 
 pub struct WidgetBase
 {
-	pub(crate) true_window_id : u32,
-	pub(crate) det : Option<Rc<RefCell<GraphicalDetails>>>,
+	pub(crate) true_window_id: Cell<u32>,
+	pub(crate) det: RefCell<Option<Rc<RefCell<GraphicalDetails>>>>,
 	rectangle : Cell<Rectangle>,
 	name : String,
 	maximum_size : Size,
@@ -454,8 +471,8 @@ impl WidgetBase
 		//let display = display.as_ref();
 		WidgetBase
 		{
-			true_window_id : 0,
-			det : None,
+			true_window_id: Cell::new(0),
+			det : RefCell::new(None),
 			rectangle: Cell::new(Rectangle::coords(0,0, 100, 100)),
 			name : name.to_string(),
 			maximum_size : Size{ width : u32::max_value(), height : u32::max_value() },
@@ -466,14 +483,20 @@ impl WidgetBase
 		Self::named("")
 	}
 
-	fn true_window_id(&self) -> u32
+	pub fn true_window_id(&self) -> u32
 	{
-		self.true_window_id
+		self.true_window_id.get()
 	}
 	
 	fn rectangle(&self) -> Rectangle
 	{
 		self.rectangle.get()
+	}
+	fn set_size(&self, sz: Size)
+	{
+		let mut r = self.rectangle.get();
+		r.resize(&sz);
+		self.rectangle.set(r);
 	}
 
 	fn maximum_size(&self) -> Size

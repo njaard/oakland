@@ -16,15 +16,10 @@ impl Widget for LineEdit
 	{
 		&mut self.widget
 	}
-	fn mouse_event(&self, _ : MouseEvent)
+	fn mouse_event(&self, e: MouseEvent, pos: &Point)
 	{
 		println!("got the event");
 		self.repaint();
-	}
-
-	fn setup(&mut self)
-	{
-
 	}
 
 	fn draw(&self, draw : &mut cairo::Cairo)

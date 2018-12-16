@@ -18,12 +18,6 @@ impl Widget for Label
 	{
 		&mut self.widget
 	}
-
-	fn setup(&mut self)
-	{
-
-	}
-
 	fn draw(&self, draw: &mut cairo::Cairo)
 	{
 		draw.set_font_size(20.0);

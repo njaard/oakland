@@ -29,12 +29,20 @@ impl Widget for MainWindow
 		&mut self.widget
 	}
 
-	fn setup(&mut self)
+	fn setup(&self, det: Rc<RefCell<GraphicalDetails>>)
 	{
-		let det = self.widget.det.as_mut().expect("det");
-		self.widget.true_window_id = det.borrow_mut().make_real_window();
+		*self.as_widget().det.borrow_mut() = Some(det.clone());
+		self.widget.true_window_id.set(det.borrow_mut().make_real_window());
+		self.setup_children(det);
 		self.setup_title();
+	}
 
+	fn setup_children(&self, det: Rc<RefCell<GraphicalDetails>>)
+	{
+		for c in self.child_widgets.borrow_mut().iter_mut()
+		{
+			c.setup(det.clone());
+		}
 		/*
 		let hints = xcb_util::icccm::SizeHints::empty()
 			.max_size(max_size.width as i32, max_size.height as i32)
@@ -52,6 +60,7 @@ impl Widget for MainWindow
 		for w in self.child_widgets.borrow().iter()
 		{
 			let wrect = w.rectangle();
+			eprintln!("MW drawing {} at {:?}", w.name(), wrect);
 			c.save();
 			c.translate(wrect.x() as f64, wrect.y() as f64);
 			c.rectangle(0.0, 0.0, wrect.width() as f64, wrect.height() as f64);
@@ -77,7 +86,6 @@ impl Widget for MainWindow
 	}
 	fn resized(&self, sz: Size)
 	{
-		self.resize(&sz);
 	}
 }
 
@@ -97,7 +105,7 @@ impl MainWindow
 	pub fn set_title(&self, title: String)
 	{
 		self.title.replace(title);
-		if self.widget.det.is_some()
+		if self.det().is_some()
 		{
 			self.setup_title();
 		}
@@ -106,8 +114,8 @@ impl MainWindow
 	fn setup_title(&self)
 	{
 		xcb_util::icccm::set_wm_name(
-			&self.widget.det.as_ref().expect("det").borrow().connection,
-			self.widget.true_window_id,
+			&self.det().as_ref().expect("det").borrow().connection,
+			self.widget.true_window_id(),
 			&*self.title.borrow(),
 		);
 	}
@@ -122,8 +130,10 @@ impl MainWindow
 		if max_size.height > (i32::max_value() as u32)
 			{ max_size.height = i32::max_value() as u32; }
 
-		widget.as_widget_mut().det = Some(self.det().clone());
-		widget.setup();
+		if let Some(c) = self.det()
+		{
+			widget.setup(c);
+		}
 
 		let b = Rc::new(widget);
 
@@ -137,13 +147,16 @@ impl MainWindow
 		{
 			let NET_WM_STATE_ADD = 1;
 			let NET_WM_STATE_REMOVE = 0;
+			let det = self.det();
+			let det = det.as_ref().expect("det").borrow();
+			let conn = &det.connection;
 
 			let atom_fullscreen = intern_atom(
-				&self.widget.det.as_ref().expect("det").borrow().connection,
+				conn,
 				"_NET_WM_STATE_FULLSCREEN"
 			);
 			let atom_state = intern_atom(
-				&self.widget.det.as_ref().expect("det").borrow().connection,
+				conn,
 				"_NET_WM_STATE"
 			);
 
@@ -159,7 +172,7 @@ impl MainWindow
 			{
 				response_type: xcb::xproto::CLIENT_MESSAGE,
 				format: 32,
-				window: self.widget.true_window_id,
+				window: self.widget.true_window_id(),
 				type_: atom_state,
 				data: d,
 				sequence: 0,
@@ -170,9 +183,9 @@ impl MainWindow
 			);
 
 			xcb::ffi::xproto::xcb_send_event(
-				self.widget.det.as_ref().expect("det").borrow().connection.get_raw_conn(),
+				conn.get_raw_conn(),
 				false as u8,
-				self.widget.det.as_ref().expect("det").borrow().screen().root() as xcb::ffi::xcb_window_t,
+				det.screen().root() as xcb::ffi::xcb_window_t,
 				(xcb::xproto::EVENT_MASK_SUBSTRUCTURE_NOTIFY |
 					xcb::xproto::EVENT_MASK_SUBSTRUCTURE_REDIRECT) as u32,
 				&ev as *const xcb::ffi::xproto::xcb_client_message_event_t

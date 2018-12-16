@@ -12,11 +12,27 @@ pub struct Size
 	pub height : u32,
 }
 
+impl Size
+{
+	fn with_width(&self, width: u32) -> Size
+	{
+		let mut s = *self;
+		s.width = width;
+		s
+	}
+	fn with_height(&self, height: u32) -> Size
+	{
+		let mut s = *self;
+		s.height = height;
+		s
+	}
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct Rectangle
 {
-	pos : Point,
-	size : Size,
+	pub pos : Point,
+	pub size : Size,
 }
 
 

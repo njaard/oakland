@@ -19,10 +19,7 @@ impl Widget for PushButton
 	{
 		&mut self.widget
 	}
-	fn setup(&mut self)
-	{
-	}
-	fn mouse_event(&self, e : MouseEvent)
+	fn mouse_event(&self, e: MouseEvent, pos: &Point)
 	{
 		eprintln!("MOUSE {} {}", self.name(), self.text.borrow());
 		if e == MouseEvent::LeftPress
@@ -482,12 +479,12 @@ impl Widget for PushButton
 
 impl PushButton
 {
-	pub fn new(text: &str) -> PushButton
+	pub fn new(text: String) -> PushButton
 	{
 		let mut w = PushButton
 		{
 			widget: WidgetBase::named("PushButton"),
-			text: RefCell::new(text.to_string()),
+			text: RefCell::new(text),
 			is_pressed: Cell::new(false),
 			clicked_callbacks: RefCell::new(vec!()),
 		};
@@ -496,14 +493,24 @@ impl PushButton
 		w
 	}
 
-	pub fn set_text(&self, text : String)
+	pub fn set_text(&self, text: String)
 	{
 		self.text.replace(text);
+	}
+	pub fn text(&self) -> String
+	{
+		self.text.borrow().clone()
 	}
 
 	pub fn on_click<F>(&self, cb : F)
 		where F: FnMut() + 'static
 	{
 		self.clicked_callbacks.borrow_mut().push(Box::new(cb));
+	}
+
+	pub fn set_pressed(&self, pressed: bool)
+	{
+		self.is_pressed.set(pressed);
+		self.repaint();
 	}
 }
