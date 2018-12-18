@@ -5,7 +5,7 @@ use display::Widget;
 
 fn main()
 {
-	let icon = image::load("/usr/share/icons/oxygen/base/128x128/actions/go-top.png")
+	let icon = image::open("/usr/share/icons/oxygen/base/128x128/actions/go-top.png")
 		.unwrap();
 
 	let g = display::Graphical::new();

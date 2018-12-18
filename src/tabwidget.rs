@@ -70,13 +70,13 @@ impl Widget for TabWidget
 	}
 	fn resized(&self, sz: Size)
 	{
-		self.tabbar.borrow().resize( &sz.with_height(30).with_width(1000) );
+		self.tabbar.borrow().resize( &sz.with_height(45).with_width(1000) );
 		for w in self.tabs.borrow().iter()
 		{
 			w.set_geometry(
 				Rectangle::coords(
-					0, 30,
-					1000, 1000-30
+					0, 45+7,
+					1000, 1000-45+7
 				)
 			);
 		}

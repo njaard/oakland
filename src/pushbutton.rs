@@ -8,6 +8,7 @@ pub struct PushButton
 	is_toggled: Cell<bool>,
 	text: RefCell<String>,
 	clicked_callbacks: RefCell<Vec<Box<FnMut()>>>,
+	font_size: Cell<f64>,
 }
 
 impl Widget for PushButton
@@ -464,7 +465,7 @@ impl Widget for PushButton
 
 		}
 		draw.set_color(Color::black());
-		draw.set_font_size(20.0);
+		draw.set_font_size(self.font_size.get());
 
 		let extents = draw.text_extents(&self.text.borrow());
 
@@ -488,6 +489,7 @@ impl PushButton
 			is_pressed: Cell::new(false),
 			is_toggled: Cell::new(false),
 			clicked_callbacks: RefCell::new(vec!()),
+			font_size: Cell::new(20.0),
 		};
 
 		w.widget.set_maximum_size(Size{ width:u32::max_value(), height:22 });
@@ -512,6 +514,11 @@ impl PushButton
 	pub fn set_toggled(&self, pressed: bool)
 	{
 		self.is_toggled.set(pressed);
+		self.repaint();
+	}
+	pub fn set_font_size(&self, points: f64)
+	{
+		self.font_size.set(points);
 		self.repaint();
 	}
 }

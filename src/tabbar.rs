@@ -65,7 +65,7 @@ impl Widget for TabBar
 		for w in self.buttons.borrow().iter()
 		{
 			w.set_geometry(
-				Rectangle::coords(x, 0, 100, 30)
+				Rectangle::coords(x, 0, 100, 45)
 			);
 			x += 107;
 		}

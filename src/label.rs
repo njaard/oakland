@@ -1,4 +1,4 @@
-use std::cell::{RefCell};
+use std::cell::{Cell,RefCell};
 
 use crate::*;
 
@@ -7,6 +7,7 @@ pub struct Label
 	widget: WidgetBase,
 	text: RefCell<String>,
 	image: RefCell<Option<cairo::surface::Surface>>,
+	font_size: Cell<f64>,
 }
 
 impl Widget for Label
@@ -27,7 +28,7 @@ impl Widget for Label
 		}
 		else
 		{
-			draw.set_font_size(20.0);
+			draw.set_font_size(self.font_size.get());
 			let height = self.height();
 			//let width = self.width();
 
@@ -48,6 +49,7 @@ impl Label
 			widget: WidgetBase::named("Label"),
 			text: RefCell::new(text.to_string()),
 			image: RefCell::new(None),
+			font_size: Cell::new(20.0),
 		};
 
 		w.widget.set_maximum_size(Size{ width:u32::max_value(), height:22 });
@@ -57,12 +59,20 @@ impl Label
 	pub fn set_text(&self, text : String)
 	{
 		self.text.replace(text);
+		*self.image.borrow_mut() = None;
 		self.repaint();
 	}
 
 	pub fn set_image(&self, image: cairo::surface::Surface)
 	{
 		*self.image.borrow_mut() = Some(image);
+		self.text.replace(String::new());
+		self.repaint();
+	}
+
+	pub fn set_font_size(&self, points: f64)
+	{
+		self.font_size.set(points);
 		self.repaint();
 	}
 }

@@ -107,17 +107,9 @@ unsafe fn surface_from_img(im: &image::DynamicImage)
 {
 	let w = im.width();
 	let h = im.height();
+	let mut v = im.to_rgba().into_raw();
 
-	let v = im.raw_pixels();
-	let v = &v[..];
-	let mut v=
-		unsafe
-		{
-			std::mem::transmute::<
-				*const u8,
-				*mut u8
-			>(v.as_ptr())
-		};
+	let mut v = v.as_mut_ptr();
 
 	let opaque;
 	{
