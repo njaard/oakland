@@ -14,6 +14,10 @@ pub struct Size
 
 impl Size
 {
+	pub fn new(width: u32, height:u32) -> Size
+	{
+		Size { width, height }
+	}
 	pub fn with_width(&self, width: u32) -> Size
 	{
 		let mut s = *self;

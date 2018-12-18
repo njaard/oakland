@@ -87,6 +87,24 @@ impl Widget for MainWindow
 	fn resized(&self, _sz: Size)
 	{
 	}
+	fn resize(&self, sz: &Size)
+	{
+		let mut rect = self.as_widget().rectangle.get();
+		rect.resize(sz);
+		self.as_widget().rectangle.set(rect);
+		self.resized(*sz);
+
+		let det = self.det();
+		let det = det.as_ref().expect("det").borrow();
+		xcb::xproto::configure_window(
+			&det.connection,
+			self.widget.true_window_id.get(),
+			&[
+				(xcb::ffi::XCB_CONFIG_WINDOW_WIDTH as u16, sz.width),
+				(xcb::ffi::XCB_CONFIG_WINDOW_HEIGHT as u16, sz.height),
+			],
+		);
+	}
 }
 
 impl MainWindow
@@ -192,39 +210,6 @@ impl MainWindow
 					as *const libc::c_char
 			);
 
-
-
-			/*
-                    let cookie = xcb::ffi::xcb_intern_atom(
-				self.widget.det.as_ref().expect("det").borrow().connection.get_raw_conn(),
-				0,
-				13, b"_NET_WM_STATE\0".as_ptr() as *const i8
-			);
-			let reply = xcb::ffi::xcb_intern_atom_reply(
-				self.widget.det.as_ref().expect("det").borrow().connection.get_raw_conn(),
-				cookie,
-				std::ptr::null_mut(),
-			);
-			let cookie2 = xcb::ffi::xcb_intern_atom(
-				self.widget.det.as_ref().expect("det").borrow().connection.get_raw_conn(),
-				0,
-				24, b"_NET_WM_STATE_FULLSCREEN\0".as_ptr() as *const i8
-			);
-			let reply2 = xcb::ffi::xcb_intern_atom_reply(
-				self.widget.det.as_ref().expect("det").borrow().connection.get_raw_conn(),
-				cookie2,
-				std::ptr::null_mut(),
-			);
-			xcb::ffi::xcb_change_property(
-				self.widget.det.as_ref().expect("det").borrow().connection.get_raw_conn(),
-				xcb::ffi::XCB_PROP_MODE_REPLACE as u8,
-				self.widget.true_window_id,
-				(*reply).atom,
-				xcb::ATOM as u32,
-				32,
-				if fullscreen { 1 } else { 0 },
-				(&(*reply2).atom) as *const u32 as *const std::ffi::c_void,
-			); */
 		}
 	}
 }

@@ -318,7 +318,6 @@ impl GraphicalDetails
 					},
 					xcb::BUTTON_RELEASE =>
 					{
-						println!("button release");
 						let button_press : &xcb::ButtonPressEvent
 							= unsafe { xcb::cast_event(&event) };
 
@@ -333,7 +332,6 @@ impl GraphicalDetails
 					{
 						let resize_req : &xcb::ConfigureNotifyEvent
 							= unsafe { xcb::cast_event(&event) };
-						println!("resize {},{}", resize_req.width(), resize_req.height());
 						let sz = Size
 						{
 							width: resize_req.width() as u32,
@@ -367,7 +365,6 @@ impl GraphicalDetails
 		{
 			let w = w.as_ref().borrow();
 			let wrect = w.rectangle();
-			eprintln!("drawing surface {:?}", wrect);
 			let mut surface = surface_from_x(
 				self.connection.get_raw_conn(),
 				self.screen().ptr,
@@ -388,6 +385,7 @@ impl GraphicalDetails
 			{
 				use crate::draw::DrawPixel;
 				let mut cr = cairo::Cairo::create(&mut surface);
+				cr.fillcolor(crate::draw::Color::rgb(0xc2,0xbb, 0xb8));
 				w.draw(&mut cr);
 			}
 			//surface.flush();
@@ -669,7 +667,7 @@ pub struct WidgetBase
 {
 	pub(crate) true_window_id: Cell<u32>,
 	pub(crate) det: RefCell<Option<Rc<RefCell<GraphicalDetails>>>>,
-	rectangle : Cell<Rectangle>,
+	pub(crate) rectangle : Cell<Rectangle>,
 	name : String,
 	maximum_size : Size,
 }
