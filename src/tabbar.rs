@@ -59,7 +59,7 @@ impl Widget for TabBar
 		}
 		None
 	}
-	fn resized(&self, sz: Size)
+	fn resized(&self, _sz: Size)
 	{
 		let mut x=0;
 		for w in self.buttons.borrow().iter()
@@ -76,7 +76,7 @@ impl Widget for TabBar
 		let c = self.current_button.get();
 		if e == MouseEvent::LeftPress
 		{
-			self.buttons.borrow()[c].set_pressed(false);
+			self.buttons.borrow()[c].set_toggled(false);
 		}
 
 		let b = self.child_at(pos);
@@ -92,11 +92,12 @@ impl Widget for TabBar
 				self.current_button.set(idx);
 				if e == MouseEvent::LeftPress
 				{
-					w.set_pressed(true);
+					w.set_toggled(true);
 				}
 				break;
 			}
 		}
+		b.mouse_event(e, pos);
 
 		self.repaint();
 	}
@@ -106,7 +107,7 @@ impl TabBar
 {
 	pub fn new() -> TabBar
 	{
-		let mut w = TabBar
+		let w = TabBar
 		{
 			widget: WidgetBase::named("TabBar"),
 			buttons: RefCell::new( vec!() ),
@@ -117,7 +118,7 @@ impl TabBar
 
 	pub fn add(&self, label: String) -> usize
 	{
-		let mut button = PushButton::new(label);
+		let button = PushButton::new(label);
 
 		let mut t = self.buttons.borrow_mut();
 		if let Some(c) = self.det()
@@ -128,7 +129,7 @@ impl TabBar
 		t.len()-1
 	}
 
-	fn current_button(&self) -> usize
+	pub fn current_button(&self) -> usize
 	{
 		self.current_button.get()
 	}

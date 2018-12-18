@@ -5,6 +5,7 @@ pub struct PushButton
 {
 	widget: WidgetBase,
 	is_pressed: Cell<bool>,
+	is_toggled: Cell<bool>,
 	text: RefCell<String>,
 	clicked_callbacks: RefCell<Vec<Box<FnMut()>>>,
 }
@@ -19,7 +20,7 @@ impl Widget for PushButton
 	{
 		&mut self.widget
 	}
-	fn mouse_event(&self, e: MouseEvent, pos: &Point)
+	fn mouse_event(&self, e: MouseEvent, _pos: &Point)
 	{
 		eprintln!("MOUSE {} {}", self.name(), self.text.borrow());
 		if e == MouseEvent::LeftPress
@@ -36,7 +37,7 @@ impl Widget for PushButton
 		let width = self.width() as i32;
 		let height = self.height() as i32;
 
-		if self.is_pressed.get()
+		if self.is_pressed.get() || self.is_toggled.get()
 		{
 			let graya = Color::rgb(0xe8, 0xe6, 0xe4);
 			let grayb = Color::rgb(0xde, 0xdb, 0xd7);
@@ -462,7 +463,6 @@ impl Widget for PushButton
 			}
 
 		}
-		let font_size = 20.0;
 		draw.set_color(Color::black());
 		draw.set_font_size(20.0);
 
@@ -486,6 +486,7 @@ impl PushButton
 			widget: WidgetBase::named("PushButton"),
 			text: RefCell::new(text),
 			is_pressed: Cell::new(false),
+			is_toggled: Cell::new(false),
 			clicked_callbacks: RefCell::new(vec!()),
 		};
 
@@ -508,9 +509,9 @@ impl PushButton
 		self.clicked_callbacks.borrow_mut().push(Box::new(cb));
 	}
 
-	pub fn set_pressed(&self, pressed: bool)
+	pub fn set_toggled(&self, pressed: bool)
 	{
-		self.is_pressed.set(pressed);
+		self.is_toggled.set(pressed);
 		self.repaint();
 	}
 }

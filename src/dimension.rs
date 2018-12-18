@@ -14,13 +14,13 @@ pub struct Size
 
 impl Size
 {
-	fn with_width(&self, width: u32) -> Size
+	pub fn with_width(&self, width: u32) -> Size
 	{
 		let mut s = *self;
 		s.width = width;
 		s
 	}
-	fn with_height(&self, height: u32) -> Size
+	pub fn with_height(&self, height: u32) -> Size
 	{
 		let mut s = *self;
 		s.height = height;

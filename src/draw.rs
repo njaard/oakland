@@ -27,7 +27,11 @@ impl Color
 	{
 		Color { r:r as f64/255.0, g:g as f64/255.0, b:b as f64/255.0, a:1.0}
 	}
-	
+	pub fn rgba(r : u32, g : u32, b : u32, a : u32) -> Color
+	{
+		Color { r:r as f64/255.0, g:g as f64/255.0, b:b as f64/255.0, a:a as f64/255.0}
+	}
+
 	pub fn xcb_color(&self) -> u32
 	{
 		let mut v = 0u32;
@@ -58,6 +62,7 @@ pub trait DrawPixel
 	fn line(&mut self, x1 : i32, y1 : i32, x2 : i32, y2 : i32);
 	fn vgradient(&mut self, y1 : i32, y2 : i32, c1 : Color, c2 : Color);
 	fn fillcolor(&mut self, c : Color);
+	fn paste(&mut self, src: &cairo::surface::Surface);
 }
 
 impl DrawPixel for cairo::Cairo
@@ -94,5 +99,24 @@ impl DrawPixel for cairo::Cairo
 		self.set_source(&mut pattern);
 		self.fill();
 		self.restore();
+	}
+
+	fn paste(&mut self, src: &cairo::surface::Surface)
+	{
+
+		let mut src=
+			unsafe
+			{
+				&mut* std::mem::transmute::<
+					*const cairo::surface::Surface,
+					*mut cairo::surface::Surface
+				>(src as *const cairo::surface::Surface)
+			};
+
+		self.save();
+		self.set_source_surface(&mut src, 0.0, 0.0);
+		self.paint();
+		self.restore();
+
 	}
 }

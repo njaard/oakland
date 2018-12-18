@@ -5,9 +5,12 @@ authors = ["Charles Samuels <charles@derkarl.org>"]
 edition="2018"
 
 [dependencies]
-xcb = "*"
+xcb =  {version="*", features=["render"] }
 xcb-util =  {version="*", features=["icccm"] }
 cairo = {path="../rust-cairo"}
 libc = "*"
 nix = "*"
 antidote = "*"
+#gc = "*"
+#gc_derive = "*"
+image="*"

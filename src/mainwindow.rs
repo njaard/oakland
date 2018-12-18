@@ -84,7 +84,7 @@ impl Widget for MainWindow
 		}
 		None
 	}
-	fn resized(&self, sz: Size)
+	fn resized(&self, _sz: Size)
 	{
 	}
 }
@@ -93,7 +93,7 @@ impl MainWindow
 {
 	pub fn new(title: &str) -> MainWindow
 	{
-		let mut w = MainWindow
+		let w = MainWindow
 		{
 			widget: WidgetBase::named("MainWindow"),
 			title: RefCell::new(title.to_string()),
@@ -120,7 +120,7 @@ impl MainWindow
 		);
 	}
 
-	pub fn put<'a, W>(&'a self, mut widget: W)
+	pub fn put<'a, W>(&'a self, widget: W)
 		-> Rc<W>
 	where W: Widget + 'static
 	{

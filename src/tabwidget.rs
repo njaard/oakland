@@ -1,16 +1,15 @@
 use crate::*;
-use std::cell::RefCell;
+use std::cell::{RefCell};
 use std::rc::Rc;
 
 pub struct TabWidget
 {
 	widget: WidgetBase,
-	tabbar: RefCell<Rc<PushButton>>,
-	tabs: RefCell<std::vec::Vec<(String,Rc<Widget>)>>,
-	visible_child: Cell<usize>,
+	tabbar: RefCell<Rc<TabBar>>,
+	tabs: RefCell<std::vec::Vec<Rc<Widget>>>,
 }
 
-impl Widget for MainWindow
+impl Widget for TabWidget
 {
 	fn as_widget(&self) -> &WidgetBase
 	{
@@ -21,27 +20,36 @@ impl Widget for MainWindow
 		&mut self.widget
 	}
 
+	fn setup_children(&self, det: Rc<RefCell<GraphicalDetails>>)
+	{
+		self.tabbar.borrow().setup(det.clone());
+		for b in self.tabs.borrow().iter()
+		{
+			b.setup(det.clone());
+		}
+	}
+
 	fn draw(&self, c: &mut cairo::Cairo)
 	{
 		use std::borrow::Borrow;
-		let c = self.child_widgets.get()[self.visible_child.get()];
 
 		{
 			let w = self.tabbar.borrow();
 			let wrect = w.rectangle();
+			eprintln!("DRAWING TABBAR ***   {:?}", wrect);
 			c.save();
 			c.translate(wrect.x() as f64, wrect.y() as f64);
 			c.rectangle(0.0, 0.0, wrect.width() as f64, wrect.height() as f64);
 			c.clip();
 
-			let w = w.as_ref().borrow();
+			let w = w.borrow();
 			w.draw(c);
 			c.restore();
 		}
-		if self.has_tabs()
+		if let Some(w) = self.current_widget()
 		{
-			let w = self.current_widget();
 			let wrect = w.rectangle();
+			eprintln!("DRAWING CONTAINER ***   {:?}", wrect);
 			c.save();
 			c.translate(wrect.x() as f64, wrect.y() as f64);
 			c.rectangle(0.0, 0.0, wrect.width() as f64, wrect.height() as f64);
@@ -55,52 +63,61 @@ impl Widget for MainWindow
 
 	fn child_at(&self, pt: &Point) -> Option<Rc<Widget>>
 	{
-		if self.tabbar.rectangle().contains(pt)
-			{ Some(self.tabbar.clone()) }
+		if self.tabbar.borrow().rectangle().contains(pt)
+			{ Some(self.tabbar.borrow().clone()) }
 		else
-		{
-			if self.has_tabs() == 0 { None }
-			else { self.current_widget() };
-		}
+			{ self.current_widget() }
 	}
 	fn resized(&self, sz: Size)
 	{
-		self.resize(&sz);
-
-		self.tabbar.borrow().resize( sz.with_height(30) );
+		self.tabbar.borrow().resize( &sz.with_height(30).with_width(1000) );
 		for w in self.tabs.borrow().iter()
 		{
 			w.set_geometry(
 				Rectangle::coords(
 					0, 30,
-					sz.width, sz.height-30
+					1000, 1000-30
 				)
 			);
 		}
 	}
+	fn mouse_event(&self, e: MouseEvent, pt: &Point)
+	{
+		if self.tabbar.borrow().rectangle().contains(pt)
+		{
+			self.tabbar.borrow().mouse_event(e, &self.tabbar.borrow().pt_from_parent(*pt));
+		}
+		else if let Some(current) = self.current_widget()
+		{
+			current.mouse_event(e, &current.pt_from_parent(*pt));
+		}
+	}
+
 }
 
 impl TabWidget
 {
 	pub fn new() -> TabWidget
 	{
-		let mut w = TabWidget
+		let w = TabWidget
 		{
 			widget: WidgetBase::named("TabWidget"),
-			tabbar: RefCell::new( TabBar::new() ),
+			tabbar: RefCell::new( Rc::new(TabBar::new()) ),
 			tabs: RefCell::new( vec!() ),
-			visible_child: Cell::new(0),
 		};
 		w
 	}
 
-	pub fn put<W>(&self, label: String, mut widget: W)
+	pub fn put<W>(&self, label: String, widget: W)
 		-> Rc<W>
 	where W: Widget + 'static
 	{
-		let t = self.tabs.borrow_mut();
+		let mut t = self.tabs.borrow_mut();
+		if let Some(c) = self.det()
+			{ widget.setup(c); }
 		let b = Rc::new(widget);
-		t.push( (label, b.clone()) );
+		t.push( b.clone() );
+		self.tabbar.borrow().add(label);
 		b
 	}
 
@@ -109,9 +126,10 @@ impl TabWidget
 		self.tabs.borrow().len() != 0
 	}
 
-	fn current_widget(&self) -> Rc<Widget>
+	fn current_widget(&self) -> Option<Rc<Widget>>
 	{
-		self.tabs.borrow()[self.visible_child.get()].clone()
+		if !self.has_tabs() { return None; }
+		Some(self.tabs.borrow()[self.tabbar.borrow().current_button()].clone())
 	}
 
 }

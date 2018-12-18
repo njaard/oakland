@@ -6,6 +6,7 @@ pub struct Label
 {
 	widget: WidgetBase,
 	text: RefCell<String>,
+	image: RefCell<Option<cairo::surface::Surface>>,
 }
 
 impl Widget for Label
@@ -20,13 +21,20 @@ impl Widget for Label
 	}
 	fn draw(&self, draw: &mut cairo::Cairo)
 	{
-		draw.set_font_size(20.0);
-		let height = self.height();
-		let width = self.width();
+		if let Some(image) = self.image.borrow().as_ref()
+		{
+			draw.paste(image);
+		}
+		else
+		{
+			draw.set_font_size(20.0);
+			let height = self.height();
+			//let width = self.width();
 
-		draw.set_color(Color::black());
-		draw.move_to(0.0, (height-5) as f64);
-		draw.show_text(&self.text.borrow());
+			draw.set_color(Color::black());
+			draw.move_to(0.0, (height-5) as f64);
+			draw.show_text(&self.text.borrow());
+		}
 	}
 }
 
@@ -39,6 +47,7 @@ impl Label
 		{
 			widget: WidgetBase::named("Label"),
 			text: RefCell::new(text.to_string()),
+			image: RefCell::new(None),
 		};
 
 		w.widget.set_maximum_size(Size{ width:u32::max_value(), height:22 });
@@ -48,6 +57,12 @@ impl Label
 	pub fn set_text(&self, text : String)
 	{
 		self.text.replace(text);
+		self.repaint();
+	}
+
+	pub fn set_image(&self, image: cairo::surface::Surface)
+	{
+		*self.image.borrow_mut() = Some(image);
 		self.repaint();
 	}
 }

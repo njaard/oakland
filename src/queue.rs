@@ -1,6 +1,4 @@
 use antidote::RwLock;
-use std::any::Any;
-use std::sync::Arc;
 
 use std::sync::mpsc;
 
@@ -34,10 +32,6 @@ impl EventPoster
 			event_w_fd,
 			receivers: RwLock::new(vec!()),
 		}
-	}
-
-	pub(crate) fn notify_posted(&self)
-	{
 	}
 
 	pub(crate) fn wait(&self) -> bool

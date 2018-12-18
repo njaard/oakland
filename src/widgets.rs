@@ -16,7 +16,7 @@ impl Widget for LineEdit
 	{
 		&mut self.widget
 	}
-	fn mouse_event(&self, e: MouseEvent, pos: &Point)
+	fn mouse_event(&self, _e: MouseEvent, _pos: &Point)
 	{
 		println!("got the event");
 		self.repaint();

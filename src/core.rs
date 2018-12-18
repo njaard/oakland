@@ -8,9 +8,11 @@ use std::sync::Arc;
 use crate::draw::Color;
 use crate::dimension::*;
 use crate::queue;
+use libc::{c_uchar, c_int};
 
+use image::GenericImage;
 
-enum Policy
+pub enum Policy
 {
 	Minimum,
 	Maximum,
@@ -20,35 +22,180 @@ enum Policy
 
 pub struct SizePolicy
 {
-	vertical : Policy,
-	horizontal : Policy,
+	pub vertical : Policy,
+	pub horizontal : Policy,
 }
 
 
 extern
 {
 	fn cairo_xcb_surface_create(
-		conn : *mut libc::c_void,
+		conn : *mut xcb::ffi::xcb_connection_t,
 		drawable : u32,
 		visual : *const xcb::ffi::xcb_visualtype_t,
 		width : std::os::raw::c_int,
 		height : std::os::raw::c_int,
 	) -> *mut libc::c_void;
+
+	fn cairo_xcb_surface_create_with_xrender_format(
+		conn: *mut xcb::ffi::xcb_connection_t,
+		screen: *mut xcb::ffi::xcb_screen_t,
+		drawable : u32,
+		format: *const xcb::ffi::render::xcb_render_pictforminfo_t,
+		width : std::os::raw::c_int,
+		height : std::os::raw::c_int,
+	) -> *mut libc::c_void;
+
+	fn cairo_image_surface_create_for_data(
+		data: *mut c_uchar,
+		format: c_int,
+		width: c_int,
+		height: c_int,
+		stride: c_int
+	) -> *mut libc::c_void;
+
+	fn cairo_xcb_surface_set_size(
+		surface: *mut libc::c_void,
+		width: c_int,
+		height: c_int,
+	);
 }
 
 fn surface_from_x(
-	conn : *mut libc::c_void,
+	conn : *mut xcb::ffi::xcb_connection_t,
+	screen : *mut xcb::ffi::xcb_screen_t,
+	format: *const xcb::ffi::render::xcb_render_pictforminfo_t,
 	drawable : u32,
-	visual : &xcb::ffi::xcb_visualtype_t,
 	width : i32,
 	height : i32
 ) -> cairo::surface::Surface
 {
+/*
 	let opaque = unsafe { cairo_xcb_surface_create(
 		conn, drawable, visual, width, height
 	) };
 	
-	cairo::surface::Surface { opaque : opaque }
+	let mut s = cairo::surface::Surface { opaque : opaque };
+	match s.status()
+	{
+		cairo::Status::Success => {},
+		s => panic!("error creating cairo surface {:?}", s),
+	}
+	s
+	*/
+
+
+	let opaque = unsafe { cairo_xcb_surface_create_with_xrender_format(
+		conn,
+		screen,
+		drawable,
+		format,
+		width, height
+	) };
+
+	let mut s = cairo::surface::Surface { opaque : opaque };
+	match s.status()
+	{
+		cairo::Status::Success => {},
+		s => panic!("error creating cairo surface {:?}", s),
+	}
+	s
+}
+
+unsafe fn surface_from_img(im: &image::DynamicImage)
+	-> cairo::surface::Surface
+{
+	let w = im.width();
+	let h = im.height();
+
+	let v = im.raw_pixels();
+	let v = &v[..];
+	let mut v=
+		unsafe
+		{
+			std::mem::transmute::<
+				*const u8,
+				*mut u8
+			>(v.as_ptr())
+		};
+
+	let opaque;
+	{
+		let pixels = v as *mut u32;
+		let pixels = std::slice::from_raw_parts_mut(pixels, (w*h) as usize);
+		for pixel in pixels
+		{
+			let alpha = *pixel >> 24;
+
+			let m =
+				|color: u32| -> u32
+				{
+					let a = alpha*color + 0x80;
+					((a >> 8) + a) >> 8
+				};
+
+			let a = *pixel;
+			//*pixel = ((a & 0xff000000) >> 24) | (a << 8);
+			*pixel = (a & 0xff000000)
+				| m(a & 0xff0000) >> 16
+				| m(a & 0x0000ff) << 16
+				| m(a & 0xff0000) >> 8
+				| m(a & 0xff0000) >> 24;
+			//*pixel = 0x33ff00ff;
+		}
+
+		opaque = cairo_image_surface_create_for_data(
+			v,
+			0, // ARGB32
+			w as i32,
+			h as i32,
+			4*w as i32
+		);
+	}
+	let mut s = cairo::surface::Surface { opaque : opaque };
+	match s.status()
+	{
+		cairo::Status::Success => {},
+		s => panic!("error creating cairo surface {:?}", s),
+	}
+
+	s
+}
+
+fn pict_formats(c: &xcb::base::Connection)
+	-> (xcb::ffi::render::xcb_render_pictforminfo_t,
+		xcb::ffi::render::xcb_render_pictforminfo_t)
+{
+	type PF = *const xcb::ffi::render::xcb_render_pictforminfo_t;
+	let mut fmt_rgb = None;
+	let mut fmt_rgba = None;
+
+	let formats = xcb::render::query_pict_formats(c).get_reply().unwrap();
+	for f in formats.formats()
+	{
+		if f.type_() == xcb::ffi::render::XCB_RENDER_PICT_TYPE_DIRECT as u8
+		{
+			if f.direct().red_mask() != 0xff &&
+				f.direct().red_shift() != 16
+				{ continue; }
+			if f.depth() == 32
+			{
+				if f.direct().alpha_mask() == 0xff &&
+					f.direct().alpha_shift() == 24
+				{
+					eprintln!("PICT {} matches", f.id());
+					fmt_rgba = Some(f.base);
+				}
+			}
+			if f.depth() == 24
+			{
+				if fmt_rgb.is_some() { continue; }
+				fmt_rgb = Some(f.base);
+			}
+		}
+	}
+
+	(fmt_rgba.unwrap(), fmt_rgb.unwrap())
 }
 
 
@@ -59,6 +206,10 @@ pub struct GraphicalDetails
 	top_level_widgets: std::vec::Vec<Rc<Widget>>,
 	repaint_everything : Cell<bool>,
 	event_post: Arc<queue::EventPoster>,
+	pict_formats: (
+		xcb::ffi::render::xcb_render_pictforminfo_t,
+		xcb::ffi::render::xcb_render_pictforminfo_t
+	),
 }
 
 impl GraphicalDetails
@@ -75,29 +226,31 @@ impl GraphicalDetails
 	
 	pub(crate) fn make_real_window(&self) -> u32
 	{
+		let visual = self.get_visual();
 		let screen = self.screen();
-		let foreground = self.connection.generate_id();
-		xcb::create_gc(
-			&self.connection, foreground, screen.root(),
-			&[
-				(xcb::GC_FOREGROUND, screen.black_pixel()),
-				(xcb::GC_GRAPHICS_EXPOSURES, 1),
-			]
-		);
+
+		let colormap_id = self.connection.generate_id();
+		xcb::create_colormap_checked(
+			&self.connection,
+			xcb::ffi::XCB_COLORMAP_ALLOC_NONE as u8,
+			colormap_id, screen.root(), visual
+		).request_check().map_err(|g| panic!("e = {}", g.error_code())).unwrap();
 
 		let win = self.connection.generate_id();
-		xcb::create_window(
+		xcb::create_window_checked(
 			&self.connection,
-			xcb::COPY_FROM_PARENT as u8,
+			32,
 			win,
 			screen.root(),
 			0, 0,
 			150, 150,
-			10,
+			1,
 			xcb::WINDOW_CLASS_INPUT_OUTPUT as u16,
-			screen.root_visual(),
+			visual,
 			&[
-				(xcb::CW_BACK_PIXEL, Color::rgb(0xc2, 0xbb, 0xb8).xcb_color()),
+				(xcb::CW_COLORMAP, colormap_id),
+				(xcb::CW_BACK_PIXEL, 0xffc2bbb8),
+				(xcb::CW_BORDER_PIXEL, 0),
 				(
 					xcb::CW_EVENT_MASK,
 					xcb::EVENT_MASK_EXPOSURE
@@ -107,23 +260,23 @@ impl GraphicalDetails
 						| xcb::EVENT_MASK_STRUCTURE_NOTIFY
 				)
 			]
-		);
+		).request_check().map_err(|g| panic!("e = {}", g.error_code())).unwrap();
 		xcb::map_window(&self.connection, win);
 
 		&self.connection.flush();
 		win
 	}
 
-	fn get_visual(&self) -> xcb::Visualtype
+	fn get_visual(&self) -> u32
 	{
 		let screen = self.screen();
 		for depth in screen.allowed_depths()
 		{
-			for visual in depth.visuals()
+			if depth.depth() == 32
 			{
-				if screen.root_visual() == visual.visual_id()
+				for visual in depth.visuals()
 				{
-					return visual;
+					return visual.visual_id();
 				}
 			}
 		}
@@ -141,67 +294,62 @@ impl GraphicalDetails
 				self.event_post.process_channels();
 			}
 
-			let event = self.connection.poll_for_event();
-			match event
+			while let Some(event) = self.connection.poll_for_event()
 			{
-				None => { () }
-				Some(event) =>
+				let r = event.response_type() & !0x80;
+				match r
 				{
-					let r = event.response_type() & !0x80;
-					match r
+					xcb::KEY_PRESS =>
 					{
-						xcb::KEY_PRESS =>
-						{
-							let key_press : &xcb::KeyPressEvent = unsafe { xcb::cast_event(&event) };
-							println!("Key '{}' pressed", key_press.detail());
-						},
-						xcb::BUTTON_PRESS =>
-						{
-							let button_press : &xcb::ButtonPressEvent
-								= unsafe { xcb::cast_event(&event) };
+						let key_press : &xcb::KeyPressEvent = unsafe { xcb::cast_event(&event) };
+						println!("Key '{}' pressed", key_press.detail());
+					},
+					xcb::BUTTON_PRESS =>
+					{
+						let button_press : &xcb::ButtonPressEvent
+							= unsafe { xcb::cast_event(&event) };
 
-							let pos = Point { x: button_press.event_x() as i32, y: button_press.event_y() as i32 };
+						let pos = Point { x: button_press.event_x() as i32, y: button_press.event_y() as i32 };
 
-							for w in &self.top_level_widgets
-							{
-								w.mouse_event(MouseEvent::LeftPress, &pos);
-							}
-						},
-						xcb::BUTTON_RELEASE =>
+						for w in &self.top_level_widgets
 						{
-							println!("button release");
-							let button_press : &xcb::ButtonPressEvent
-								= unsafe { xcb::cast_event(&event) };
+							w.mouse_event(MouseEvent::LeftPress, &pos);
+						}
+					},
+					xcb::BUTTON_RELEASE =>
+					{
+						println!("button release");
+						let button_press : &xcb::ButtonPressEvent
+							= unsafe { xcb::cast_event(&event) };
 
-							let pos = Point { x: button_press.event_x() as i32, y: button_press.event_y() as i32 };
+						let pos = Point { x: button_press.event_x() as i32, y: button_press.event_y() as i32 };
 
-							for w in &self.top_level_widgets
-							{
-								w.mouse_event(MouseEvent::LeftRelease, &pos);
-							}
-						},
-						xcb::CONFIGURE_NOTIFY =>
+						for w in &self.top_level_widgets
 						{
-							let resize_req : &xcb::ConfigureNotifyEvent
-								= unsafe { xcb::cast_event(&event) };
-							println!("resize {},{}", resize_req.width(), resize_req.height());
-							let sz = Size
-							{
-								width: resize_req.width() as u32,
-								height: resize_req.height() as u32,
-							};
-							for w in &self.top_level_widgets
-							{
-								w.as_widget().set_size(sz);
-								w.resized(sz);
-							}
-						},
-						xcb::EXPOSE =>
+							w.mouse_event(MouseEvent::LeftRelease, &pos);
+						}
+					},
+					xcb::CONFIGURE_NOTIFY =>
+					{
+						let resize_req : &xcb::ConfigureNotifyEvent
+							= unsafe { xcb::cast_event(&event) };
+						println!("resize {},{}", resize_req.width(), resize_req.height());
+						let sz = Size
 						{
-							self.paint_everything();
-						},
-						_ => {}
-					}
+							width: resize_req.width() as u32,
+							height: resize_req.height() as u32,
+						};
+						for w in &self.top_level_widgets
+						{
+							w.as_widget().set_size(sz);
+							w.resized(sz);
+						}
+					},
+					xcb::EXPOSE =>
+					{
+						self.paint_everything();
+					},
+					_ => {}
 				}
 			}
 			
@@ -215,31 +363,73 @@ impl GraphicalDetails
 	fn paint_everything(&self)
 	{
 		self.repaint_everything.set(false);
-		let visual = self.get_visual();
 		for w in &self.top_level_widgets
 		{
 			let w = w.as_ref().borrow();
 			let wrect = w.rectangle();
 			eprintln!("drawing surface {:?}", wrect);
 			let mut surface = surface_from_x(
-				self.connection.get_raw_conn() as *mut libc::c_void,
+				self.connection.get_raw_conn(),
+				self.screen().ptr,
+				&self.pict_formats.0,
 				w.as_widget().true_window_id(),
-				&visual.base,
 				wrect.width() as i32,
 				wrect.height() as i32,
 			);
-			
+			/*unsafe
+			{
+				cairo_xcb_surface_set_size(
+					surface.opaque,
+					wrect.width() as c_int,
+					wrect.height() as c_int,
+				);
+			}*/
+
 			{
 				use crate::draw::DrawPixel;
 				let mut cr = cairo::Cairo::create(&mut surface);
-				cr.fillcolor(Color::rgb(0xc2, 0xbb, 0xb8));
 				w.draw(&mut cr);
 			}
-			surface.flush();
+			//surface.flush();
 			surface.finish();
 		}
 		
 		self.connection.flush();
+	}
+
+	pub fn pixmap(&self, from: &image::DynamicImage)
+		-> cairo::surface::Surface
+	{
+		let mut dest_surface;
+		unsafe
+		{
+			let dest_id = xcb::ffi::base::xcb_generate_id(self.connection.get_raw_conn());
+
+			xcb::xproto::create_pixmap_checked(
+				&self.connection,
+				32,
+				dest_id,
+				self.screen().root(),
+				from.width() as u16,
+				from.height() as u16,
+			).request_check().map_err(|g| panic!("e = {}", g.error_code())).unwrap();
+			dest_surface = surface_from_x(
+				self.connection.get_raw_conn(),
+				self.screen().ptr,
+				&self.pict_formats.0,
+				dest_id,
+				from.width() as i32,
+				from.height() as i32,
+			);
+
+			let mut source = surface_from_img(from);
+			use crate::draw::DrawPixel;
+			let mut cr = cairo::Cairo::create(&mut dest_surface);
+			cr.set_operator(cairo::operator::Operator::Source);
+			cr.set_source_surface(&mut source, 0.0, 0.0);
+			cr.paint();
+		}
+		dest_surface
 	}
 
 	fn repaint_everything(&self)
@@ -365,6 +555,19 @@ pub trait Widget
 	{
 		None
 	}
+
+	fn pt_from_parent(&self, mut pt: Point) -> Point
+	{
+		pt.x -= self.rectangle().x();
+		pt.y -= self.rectangle().y();
+		pt
+	}
+	fn rect_from_parent(&self, mut r: Rectangle) -> Rectangle
+	{
+		r.pos.x -= self.rectangle().x();
+		r.pos.y -= self.rectangle().y();
+		r
+	}
 }
 
 impl std::fmt::Debug for Widget
@@ -388,6 +591,7 @@ impl Graphical
 	{
 		let conn = xcb::Connection::connect(None).unwrap();
 		let event_post = Arc::new(queue::EventPoster::new(&conn.0));
+		let pict_formats = pict_formats(&conn.0);
 		let g = GraphicalDetails
 		{
 			connection : conn.0,
@@ -395,6 +599,7 @@ impl Graphical
 			top_level_widgets : vec!(),
 			repaint_everything : Cell::new(false),
 			event_post,
+			pict_formats,
 		};
 		
 		Graphical
@@ -440,6 +645,12 @@ impl Graphical
 	{
 		let a : &RefCell<GraphicalDetails> = self.det.borrow();
 		a.borrow().exec();
+	}
+	pub fn pixmap(&self, from: &image::DynamicImage)
+		-> cairo::surface::Surface
+	{
+		let a : &RefCell<GraphicalDetails> = self.det.borrow();
+		a.borrow().pixmap(from)
 	}
 }
 
@@ -516,10 +727,6 @@ impl WidgetBase
 		{
 			let a : &RefCell<GraphicalDetails> = a.borrow();
 			a.borrow().repaint_everything();
-		}
-		else
-		{
-			panic!("no connection in {}", self.name);
 		}
 	}
 }
