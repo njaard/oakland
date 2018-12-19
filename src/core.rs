@@ -129,10 +129,9 @@ unsafe fn surface_from_img(im: &image::DynamicImage)
 			let a = *pixel;
 			//*pixel = ((a & 0xff000000) >> 24) | (a << 8);
 			*pixel = (a & 0xff000000)
-				| m(a & 0xff0000) >> 16
+				| m((a & 0xff0000) >> 16)
 				| m(a & 0x0000ff) << 16
-				| m(a & 0xff0000) >> 8
-				| m(a & 0xff0000) >> 24;
+				| m((a & 0xff00) >> 8) << 8;
 			//*pixel = 0x33ff00ff;
 		}
 
