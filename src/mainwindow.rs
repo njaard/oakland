@@ -131,11 +131,25 @@ impl MainWindow
 
 	fn setup_title(&self)
 	{
-		xcb_util::icccm::set_wm_name(
-			&self.det().as_ref().expect("det").borrow().connection,
-			self.widget.true_window_id(),
-			&*self.title.borrow(),
+		let det = self.det();
+		let det = det.as_ref().expect("det").borrow();
+		let conn = &det.connection;
+		let atom_wm_name = intern_atom(
+			conn,
+			"_NET_WM_NAME"
 		);
+		let utf8 = intern_atom(conn, "UTF8_STRING");
+
+		xcb::xproto::change_property(
+			conn,
+			xcb::ffi::XCB_PROP_MODE_REPLACE as u8,
+			self.widget.true_window_id(),
+			atom_wm_name,
+			utf8,
+			8,
+			self.title.borrow().as_bytes()
+		);
+
 	}
 
 	pub fn put<'a, W>(&'a self, widget: W)
