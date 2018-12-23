@@ -65,14 +65,20 @@ impl Widget for Container
 		if b.is_none() { return; }
 		let b = b.unwrap();
 
+		let mut child = None;
+
 		for w in self.children.borrow().iter()
 		{
 			let w2: Rc<Widget> = w.clone();
 			if Rc::ptr_eq(&w2, &b)
 			{
-				w.mouse_event(e, pos);
+				child = Some(w2);
 				break;
 			}
+		}
+		if let Some(w) = child
+		{
+			w.mouse_event(e, pos);
 		}
 	}
 }
