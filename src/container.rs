@@ -105,5 +105,24 @@ impl Container
 		self.children.borrow_mut().push( b.clone() );
 		b
 	}
+
+	pub fn remove(&self, widget: Rc<Widget>)
+	{
+		let mut remove_at = None;
+		for (idx,w) in self.children.borrow().iter().enumerate()
+		{
+			let w2: Rc<Widget> = w.clone();
+			if Rc::ptr_eq(&w2, &widget)
+			{
+				remove_at = Some(idx);
+				break;
+			}
+		}
+		if let Some(idx) = remove_at
+		{
+			self.children.borrow_mut().remove(idx);
+			self.repaint();
+		}
+	}
 }
 
