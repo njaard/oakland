@@ -78,10 +78,35 @@ impl Widget for Container
 		}
 		if let Some(w) = child
 		{
-			w.mouse_event(e, pos);
+			w.mouse_event(e, &w.pt_from_parent(*pos));
 		}
 	}
 }
+
+pub trait MaybeRc
+{
+	type W;
+	fn convert(self) -> Rc<Self::W>;
+}
+
+impl<T: Widget> MaybeRc for Rc<T>
+{
+	type W = T;
+	fn convert(self) -> Rc<T>
+	{
+		self
+	}
+}
+
+impl<T: Widget> MaybeRc for T
+{
+	type W = T;
+	fn convert(self) -> Rc<T>
+	{
+		Rc::new(self)
+	}
+}
+
 
 impl Container
 {
@@ -95,18 +120,16 @@ impl Container
 		w
 	}
 
-	pub fn put<'a, W>(&'a self, widget: W)
-		-> Rc<W>
-	where W: Widget + 'static
+	pub fn put<'a, M>(&'a self, widget: M)
+		-> Rc<M::W>
+	where M: MaybeRc,
+		M::W: Widget + 'static
 	{
+		let b = widget.convert();
 		if let Some(c) = self.det()
 		{
-			widget.setup(c);
+			b.setup(c);
 		}
-
-		if let Some(c) = self.det()
-			{ widget.setup(c); }
-		let b = Rc::new(widget);
 
 		self.children.borrow_mut().push( b.clone() );
 		b
@@ -114,18 +137,24 @@ impl Container
 
 	pub fn remove(&self, widget: Rc<Widget>)
 	{
+		use std::ops::Deref;
+		use std::mem::transmute;
 		let mut remove_at = None;
+		let (a,_) = unsafe { transmute::<_, (usize, usize)>(widget.deref()) };
 		for (idx,w) in self.children.borrow().iter().enumerate()
 		{
-			let w2: Rc<Widget> = w.clone();
-			if Rc::ptr_eq(&w2, &widget)
+			let (b,_) = unsafe { transmute::<_, (usize, usize)>(w.deref()) };
+			if a == b
 			{
 				remove_at = Some(idx);
 				break;
 			}
 		}
+
+		eprintln!("********* REMOVEDing");
 		if let Some(idx) = remove_at
 		{
+			eprintln!("********* REMOVED AT {}", idx);
 			self.children.borrow_mut().remove(idx);
 			self.repaint();
 		}

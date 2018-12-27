@@ -11,6 +11,7 @@ use crate::queue;
 use libc::{c_uchar, c_int};
 
 use image::GenericImage;
+use image::GenericImageView;
 
 pub enum Policy
 {
