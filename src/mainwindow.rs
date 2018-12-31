@@ -60,7 +60,6 @@ impl Widget for MainWindow
 		for w in self.child_widgets.borrow().iter()
 		{
 			let wrect = w.rectangle();
-			eprintln!("MW drawing {} at {:?}", w.name(), wrect);
 			c.save();
 			c.translate(wrect.x() as f64, wrect.y() as f64);
 			c.rectangle(0.0, 0.0, wrect.width() as f64, wrect.height() as f64);
@@ -78,7 +77,6 @@ impl Widget for MainWindow
 		{
 			if w.rectangle().contains(pt)
 			{
-				eprintln!("CHILD_AT {} has {:?}", self.name(), pt);
 				return Some(w.clone());
 			}
 		}

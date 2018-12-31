@@ -135,8 +135,9 @@ impl Container
 		b
 	}
 
-	pub fn remove(&self, widget: Rc<Widget>)
+	pub fn remove<U: Widget>(&self, widget: &Rc<U>)
 	{
+		let widget: Rc<Widget> = widget.clone();
 		use std::ops::Deref;
 		use std::mem::transmute;
 		let mut remove_at = None;

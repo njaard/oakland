@@ -35,7 +35,6 @@ impl Widget for TabBar
 		for w in self.buttons.borrow().iter()
 		{
 			let wrect = w.rectangle();
-			eprintln!("tabbar drawing {} at {:?}", w.name(), wrect);
 			c.save();
 			c.translate(wrect.x() as f64, wrect.y() as f64);
 			c.rectangle(0.0, 0.0, wrect.width() as f64, wrect.height() as f64);
@@ -53,7 +52,6 @@ impl Widget for TabBar
 		{
 			if w.rectangle().contains(pt)
 			{
-				eprintln!("CHILD_AT {} has {:?}", self.name(), pt);
 				return Some(w.clone());
 			}
 		}
@@ -88,7 +86,6 @@ impl Widget for TabBar
 			let w2: Rc<Widget> = w.clone();
 			if Rc::ptr_eq(&w2, &b)
 			{
-				eprintln!("clicked on {}", w.text());
 				self.current_button.set(idx);
 				if e == MouseEvent::LeftPress
 				{
