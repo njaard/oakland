@@ -1,15 +1,14 @@
-extern crate display;
-
-use display::Widget;
+/*
+use oakland::Widget;
 use std::borrow::Borrow;
 
 fn main()
 {
-	let mut g = display::Graphical::new();
+	let mut g = oakland::Graphical::new();
 	
-	let mut layout = display::VBoxLayout::new();
+	let mut layout = oakland::VBoxLayout::new();
 	
-	let mut w = display::PushButton::new();
+	let mut w = oakland::PushButton::new();
 	w.set_text("Hello".into());
 	{
 		let g = g.clone();
@@ -19,7 +18,7 @@ fn main()
 	}
 	layout.put(w);
 
-	let mut w = display::LineEdit::new();
+	let mut w = oakland::LineEdit::new();
 	w.set_text("Hello".into());
 	layout.put(w);
 	
@@ -30,3 +29,5 @@ fn main()
 	g.exec();
 }
 
+*/
+fn main() {}

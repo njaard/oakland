@@ -175,7 +175,7 @@ fn pict_formats(c: &xcb::base::Connection)
 				if f.direct().alpha_mask() == 0xff &&
 					f.direct().alpha_shift() == 24
 				{
-					eprintln!("PICT {} matches", f.id());
+					//eprintln!("PICT {} matches", f.id());
 					fmt_rgba = Some(f.base);
 				}
 			}
@@ -424,7 +424,6 @@ impl GraphicalDetails
 
 	fn repaint_everything(&self)
 	{
-		println!("marking a repaint as necessary");
 		self.repaint_everything.set(true);
 	}
 

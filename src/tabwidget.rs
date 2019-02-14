@@ -36,7 +36,6 @@ impl Widget for TabWidget
 		{
 			let w = self.tabbar.borrow();
 			let wrect = w.rectangle();
-			eprintln!("DRAWING TABBAR ***   {:?}", wrect);
 			c.save();
 			c.translate(wrect.x() as f64, wrect.y() as f64);
 			c.rectangle(0.0, 0.0, wrect.width() as f64, wrect.height() as f64);
@@ -49,7 +48,6 @@ impl Widget for TabWidget
 		if let Some(w) = self.current_widget()
 		{
 			let wrect = w.rectangle();
-			eprintln!("DRAWING CONTAINER ***   {:?}", wrect);
 			c.save();
 			c.translate(wrect.x() as f64, wrect.y() as f64);
 			c.rectangle(0.0, 0.0, wrect.width() as f64, wrect.height() as f64);

@@ -1,8 +1,10 @@
 [package]
-name = "display"
+name = "oakland"
 version = "0.1.0"
-authors = ["Charles Samuels <charles@derkarl.org>"]
+description="An experimental GUI library for X-Windows"
+authors = ["Charles Samuels <ks@ks.ax>"]
 edition="2018"
+keywords=["gui"]
 
 [dependencies]
 xcb =  {version="*", features=["render"] }
@@ -11,6 +13,4 @@ cairo = {path="../rust-cairo"}
 libc = "*"
 nix = "*"
 antidote = "*"
-#gc = "*"
-#gc_derive = "*"
 image="*"
