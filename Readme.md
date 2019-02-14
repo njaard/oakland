@@ -8,9 +8,9 @@ Here's a program which just shows a window:
 
 
 ```
-	let g = Rc::new(oakland::Graphical::new());
-	let main = g.put(oakland::MainWindow::new("My Main Window"));
-	g.exec();
+let g = Rc::new(oakland::Graphical::new());
+let main = g.put(oakland::MainWindow::new("My Main Window"));
+g.exec();
 ```
 
 When you `put` a widget onto another, it returns the widget
@@ -22,3 +22,6 @@ which activates the function `handler` on the event loop.
 
 Only push buttons, labels, and tabbars are supported right now,
 and they don't look great.
+
+I wrote it for writing an appliance on a Raspberry Pi. Therefor
+it is known to cross-compile and run on that target.
